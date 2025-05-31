@@ -7,9 +7,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB bağlantısı
+// MongoDB bağlantısı (timeout artırıldı)
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 20000, // 20 saniyeye çıkarıldı
+  })
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
@@ -36,6 +40,7 @@ app.use("/api/citydistricts", cityDistrictRoutes);
 app.use("/api/images", imageRoutes);
 app.use("/api/loginlogs", loginLogRoutes);
 
+// Ana endpoint
 app.get("/", (req, res) => {
   res.send("IAU House Rental Backend is working ✅");
 });
