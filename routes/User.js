@@ -83,5 +83,16 @@ router.put("/update/:id", async (req, res) => {
     res.status(500).json({ error: "Güncelleme hatası", details: err.message });
   }
 });
+// 🔍 Tüm kullanıcıları listele (geçici kontrol için)
+router.get("/", async (req, res) => {
+  try {
+    const users = await User.find().select("-password"); // şifre hariç tüm veriler
+    res.json(users);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Kullanıcılar alınamadı", details: err.message });
+  }
+});
 
 module.exports = router;
