@@ -94,5 +94,16 @@ router.get("/", async (req, res) => {
       .json({ error: "Kullanıcılar alınamadı", details: err.message });
   }
 });
+// 🔽 TÜM KULLANICILARI GETİR (admin için örnek)
+router.get("/", async (req, res) => {
+  try {
+    const users = await User.find();
+    res.json(users);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Kullanıcıları alma hatası", details: err.message });
+  }
+});
 
 module.exports = router;
