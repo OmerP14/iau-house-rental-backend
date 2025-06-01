@@ -1,15 +1,26 @@
 const mongoose = require("mongoose");
 
-const listingSchema = new mongoose.Schema({
-  title: String,
-  description: String,
-  price: Number,
-  city: String,
-  district: String,
-  address: String,
-  images: [String], // resim URL’leri
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  createdAt: { type: Date, default: Date.now },
-});
+const ListingSchema = new mongoose.Schema(
+  {
+    title: String,
+    price: Number,
+    city: String,
+    district: String,
+    location: String,
+    bedrooms: Number,
+    bathrooms: Number,
+    area: Number, // 👈 Bunu ekliyoruz
+    furnished: Boolean,
+    petFriendly: Boolean,
+    features: [String],
+    images: [String],
+    landlord: {
+      name: String,
+      avatar: String,
+      rating: Number,
+    },
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model("Listing", listingSchema);
+module.exports = mongoose.model("Listing", ListingSchema);
