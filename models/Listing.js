@@ -14,11 +14,14 @@ const listingSchema = new mongoose.Schema(
     petFriendly: Boolean,
     features: [String],
     images: [String],
-    description: String, // ✅ EKLENDİ
+    description: String,
     landlord: {
-      name: String,
-      avatar: String,
-      rating: Number,
+      type: {
+        name: String,
+        avatar: String,
+        rating: Number,
+      },
+      required: false,
     },
   },
   { timestamps: true }
