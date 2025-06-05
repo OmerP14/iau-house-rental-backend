@@ -1,3 +1,5 @@
+// /routes/User.js
+
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -7,24 +9,33 @@ const LoginLog = require("../models/LoginLog");
 // ✅ Kullanıcı Kayıt (Register)
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, isLandlord } = req.body;
+    const { name, email, password, isLandlord, avatar, rating } = req.body;
 
+    // 1) Aynı e-posta kayıtlı mı?
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "Bu e-posta zaten kayıtlı." });
     }
 
+    // 2) Şifreyi hash’le
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 3) Yeni kullanıcı objesini oluştur
     const newUser = new User({
       name,
       email,
       password: hashedPassword,
-      isLandlord,
+      isLandlord: isLandlord || false,
+      avatar: avatar || undefined, // Eğer avatar gönderildiyse kullan, yoksa modelin default’u geçerli
+      rating: rating || undefined, // Aynı şekilde rating
     });
 
+    // 4) Kaydet ve döndür
     const savedUser = await newUser.save();
-    res.status(201).json({ message: "Kayıt başarılı", user: savedUser });
+    // Şifreyi geri dönmeyelim:
+    const userToReturn = savedUser.toObject();
+    delete userToReturn.password;
+    res.status(201).json({ message: "Kayıt başarılı", user: userToReturn });
   } catch (err) {
     res.status(500).json({ error: "Kayıt başarısız", details: err.message });
   }
@@ -35,58 +46,38 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1) Kullanıcı var mı?
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "Kullanıcı bulunamadı" });
     }
 
+    // 2) Şifre doğru mu?
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: "Şifre yanlış" });
     }
 
-    // Giriş log kaydı
+    // 3) Giriş log kaydı
     await new LoginLog({
       userId: user._id,
       ip: req.ip,
       userAgent: req.headers["user-agent"],
     }).save();
 
-    res.status(200).json({ message: "Giriş başarılı", user });
+    // 4) Dönülecek kullanıcıdan şifre alanını çıkar
+    const userToReturn = user.toObject();
+    delete userToReturn.password;
+    res.status(200).json({ message: "Giriş başarılı", user: userToReturn });
   } catch (err) {
     res.status(500).json({ error: "Giriş başarısız", details: err.message });
   }
 });
 
-// 🗑️ Kullanıcı Sil (admin)
-router.delete("/delete/:id", async (req, res) => {
-  try {
-    const deleted = await User.findByIdAndDelete(req.params.id);
-    if (!deleted)
-      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
-    res.json({ message: "Kullanıcı silindi", deleted });
-  } catch (err) {
-    res.status(500).json({ error: "Silme hatası", details: err.message });
-  }
-});
-
-// ✏️ Kullanıcı Güncelle (admin veya kullanıcı)
-router.put("/update/:id", async (req, res) => {
-  try {
-    const updated = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    if (!updated)
-      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
-    res.json({ message: "Kullanıcı güncellendi", updated });
-  } catch (err) {
-    res.status(500).json({ error: "Güncelleme hatası", details: err.message });
-  }
-});
-// 🔍 Tüm kullanıcıları listele (geçici kontrol için)
+// 🔍 Tüm Kullanıcıları Listele (Şifre hariç)
 router.get("/", async (req, res) => {
   try {
-    const users = await User.find().select("-password"); // şifre hariç tüm veriler
+    const users = await User.find().select("-password");
     res.json(users);
   } catch (err) {
     res
@@ -94,15 +85,38 @@ router.get("/", async (req, res) => {
       .json({ error: "Kullanıcılar alınamadı", details: err.message });
   }
 });
-// 🔽 TÜM KULLANICILARI GETİR (admin için örnek)
-router.get("/", async (req, res) => {
+
+// ✏️ Kullanıcı Güncelle (admin veya kullanıcı kendisi)
+router.put("/update/:id", async (req, res) => {
   try {
-    const users = await User.find();
-    res.json(users);
+    // İsteğe bağlı: burada isLandlord, avatar, rating gibi alanlar da güncellenebilir
+    const updateData = { ...req.body };
+    if (updateData.password) {
+      // Eğer şifre değiştiriliyorsa yeniden hash’leyelim
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+    const updated = await User.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+    }).select("-password");
+    if (!updated) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+    res.json({ message: "Kullanıcı güncellendi", user: updated });
   } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Kullanıcıları alma hatası", details: err.message });
+    res.status(500).json({ error: "Güncelleme hatası", details: err.message });
+  }
+});
+
+// 🗑️ Kullanıcı Sil (admin)
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const deleted = await User.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+    res.json({ message: "Kullanıcı silindi", deleted });
+  } catch (err) {
+    res.status(500).json({ error: "Silme hatası", details: err.message });
   }
 });
 
